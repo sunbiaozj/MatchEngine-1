@@ -53,38 +53,37 @@ public class MatchingService {
         try (FileInputStream fisX = new FileInputStream(fileX);
              BufferedReader brX = new BufferedReader(new InputStreamReader(fisX));
              FileInputStream fisY = new FileInputStream(fileY);
-             BufferedReader brY = new BufferedReader(new InputStreamReader(fisY));
+             BufferedReader brY = new BufferedReader(new InputStreamReader(fisY))
         ) {
-            String lineX = null;
-            String lineY = null;
+            String lineX;
+            String lineY;
             while ((lineX = brX.readLine()) != null && (lineY = brY.readLine()) != null) {
                 Transaction transactionX = populate(lineX);
                 Transaction transactionY = populate(lineY);
                 List<MatchType> matchResults = new ArrayList<>();
-
-                MatchType accountMatchType = MatchCriteria.ACCOUNT.getMatching().isMatch(transactionX, transactionY);
-                matchResults.add(accountMatchType);
-                if (accountMatchType != MatchType.BREAK) {
-                    for (MatchCriteria matchCriteria : MatchCriteria.values()) {
-                        if (matchCriteria != MatchCriteria.ACCOUNT) {
-                            matchResults.add(matchCriteria.getMatching().isMatch(transactionX, transactionY));
+                if (null != transactionX && null != transactionY) {
+                    MatchType accountMatchType = MatchCriteria.ACCOUNT.getMatching().isMatch(transactionX, transactionY);
+                    matchResults.add(accountMatchType);
+                    if (accountMatchType != MatchType.BREAK) {
+                        for (MatchCriteria matchCriteria : MatchCriteria.values()) {
+                            if (matchCriteria != MatchCriteria.ACCOUNT) {
+                                matchResults.add(matchCriteria.getMatching().isMatch(transactionX, transactionY));
+                            }
                         }
                     }
-                }
 
-                if (isBreak(matchResults)) {
-                    BreakItem breakItemX = new BreakItem(transactionX.getTransactionId());
-                    BreakItem breakItemY = new BreakItem(transactionY.getTransactionId());
-                    breakItemMapX.put(breakItemX.getId(), breakItemX);
-                    breakItemMapY.put(breakItemY.getId(), breakItemY);
-                } else {
-                    MatchItem matchItem = new MatchItem(transactionX.getTransactionId(), transactionY.getTransactionId());
-                    matchItem.setMatchType(isWeak(matchResults) ? MatchType.WEAK : MatchType.STRONG);
-                    setMatchLevel(matchItem, transactionX, transactionY, false);
+                    if (isBreak(matchResults)) {
+                        BreakItem breakItemX = new BreakItem(transactionX.getTransactionId());
+                        BreakItem breakItemY = new BreakItem(transactionY.getTransactionId());
+                        breakItemMapX.put(breakItemX.getId(), breakItemX);
+                        breakItemMapY.put(breakItemY.getId(), breakItemY);
+                    } else {
+                        MatchItem matchItem = new MatchItem(transactionX.getTransactionId(), transactionY.getTransactionId());
+                        matchItem.setMatchType(isWeak(matchResults) ? MatchType.WEAK : MatchType.STRONG);
+                        setMatchLevel(matchItem, transactionX, transactionY, false);
+                    }
                 }
             }
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -96,9 +95,7 @@ public class MatchingService {
         File fileY = new File(fileYPath);
 
         try (Stream<String> stream = Files.lines(Paths.get(fileX.getPath()))) {
-            stream.forEach(s -> {
-                transListX.add(populate(s));
-            });
+            stream.forEach(s -> transListX.add(populate(s)));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -106,50 +103,49 @@ public class MatchingService {
         try (Stream<String> stream = Files.lines(Paths.get(fileY.getPath()))) {
             stream.forEach(s -> {
                 Transaction transactionY = populate(s);
-                final MatchItem matchItem = new MatchItem();
-                Optional<Transaction> optional = transListX.stream().filter(transactionX -> {
-                    List<MatchType> matchResults = new ArrayList<>();
+                if (null != transactionY) {
+                    final MatchItem matchItem = new MatchItem();
+                    Optional<Transaction> optional = transListX.stream().filter(transactionX -> {
+                        List<MatchType> matchResults = new ArrayList<>();
 
-                    MatchType accountMatchType = MatchCriteria.ACCOUNT.getMatching().isMatch(transactionX, transactionY);
-                    matchResults.add(accountMatchType);
-                    if(strongMatchItemMap.get(transactionX.getTransactionId()) != null
-                            || weakMatchItemMap.get(transactionX.getTransactionId()) != null) {
-                        return false;
-                    } else {
-                        if (accountMatchType != MatchType.BREAK) {
-                            for (MatchCriteria matchCriteria : MatchCriteria.values()) {
-                                if (matchCriteria != MatchCriteria.ACCOUNT) {
-                                    matchResults.add(matchCriteria.getMatching().isMatch(transactionX, transactionY));
-                                }
-                            }
-                        }
-                        if (isBreak(matchResults)) {
+                        MatchType accountMatchType = MatchCriteria.ACCOUNT.getMatching().isMatch(transactionX, transactionY);
+                        matchResults.add(accountMatchType);
+                        if(strongMatchItemMap.get(transactionX.getTransactionId()) != null
+                                || weakMatchItemMap.get(transactionX.getTransactionId()) != null) {
                             return false;
                         } else {
-                            matchItem.setId1(transactionX.getTransactionId());
-                            matchItem.setId2(transactionY.getTransactionId());
-                            matchItem.setMatchType(isWeak(matchResults) ? MatchType.WEAK : MatchType.STRONG);
-                            setMatchLevel(matchItem, transactionX, transactionY, true);
-                            return true;
+                            if (accountMatchType != MatchType.BREAK) {
+                                for (MatchCriteria matchCriteria : MatchCriteria.values()) {
+                                    if (matchCriteria != MatchCriteria.ACCOUNT) {
+                                        matchResults.add(matchCriteria.getMatching().isMatch(transactionX, transactionY));
+                                    }
+                                }
+                            }
+                            if (isBreak(matchResults)) {
+                                return false;
+                            } else {
+                                matchItem.setId1(transactionX.getTransactionId());
+                                matchItem.setId2(transactionY.getTransactionId());
+                                matchItem.setMatchType(isWeak(matchResults) ? MatchType.WEAK : MatchType.STRONG);
+                                setMatchLevel(matchItem, transactionX, transactionY, true);
+                                return true;
+                            }
                         }
-                    }
-                }).findFirst();
+                    }).findFirst();
 
-                // This means the transactionY is a break
-                if (!optional.isPresent()) {
-                    BreakItem breakItemY = new BreakItem(transactionY.getTransactionId());
-                    breakItemMapY.put(breakItemY.getId(), breakItemY);
+                    // This means the transactionY is a break
+                    if (!optional.isPresent()) {
+                        BreakItem breakItemY = new BreakItem(transactionY.getTransactionId());
+                        breakItemMapY.put(breakItemY.getId(), breakItemY);
+                    }
                 }
             });
 
             // Get all X transactions that have no match and put into BreakMap
-            transListX.parallelStream().filter(transaction -> {
-                if(strongMatchItemMap.get(transaction.getTransactionId()) == null
-                        && weakMatchItemMap.get(transaction.getTransactionId()) == null) {
-                    return true;
-                }
-                return false;
-            }).collect(Collectors.toList()).forEach(tXBreak -> {
+            transListX.parallelStream().filter(transaction ->
+                    strongMatchItemMap.get(transaction.getTransactionId()) == null
+                    && weakMatchItemMap.get(transaction.getTransactionId()) == null)
+                      .collect(Collectors.toList()).forEach(tXBreak -> {
                 BreakItem breakItem = new BreakItem(tXBreak.getTransactionId());
                 breakItemMapX.put(breakItem.getId(), breakItem);
             });
@@ -162,25 +158,17 @@ public class MatchingService {
     private void printReport() {
         System.out.println("Report");
         System.out.println("# XY exact matches");
-        strongMatchItemList.forEach((v) -> {
-            System.out.println(v.getId1() + v.getId2());
-        });
+        strongMatchItemList.forEach((v) -> System.out.println(v.getId1() + v.getId2()));
 
         System.out.println("# XY weak matches");
-        weakMatchItemList.forEach((v) -> {
-            System.out.print(v.getId1() + v.getId2() + ", ");
-        });
+        weakMatchItemList.forEach((v) -> System.out.print(v.getId1() + v.getId2() + ", "));
         System.out.println();
         System.out.println("# X breaks");
-        breakItemMapX.forEach((k, v) -> {
-            System.out.print(k + ", ");
-        });
+        breakItemMapX.forEach((k, v) -> System.out.print(k + ", "));
 
         System.out.println();
         System.out.println("# Y breaks");
-        breakItemMapY.forEach((k, v) -> {
-            System.out.print(k + ", ");
-        });
+        breakItemMapY.forEach((k, v) -> System.out.print(k + ", "));
     }
 
     private void setMatchLevel(MatchItem matchItem, Transaction transactionX, Transaction transactionY, boolean leftIdOnly) {
@@ -197,10 +185,6 @@ public class MatchingService {
         return transactionX.getTransactionId() + (leftIdOnly ? EMPTY : transactionY.getTransactionId());
     }
 
-    private String constructKey(Transaction transaction) {
-        return transaction.getTransactionId();
-    }
-
     private boolean isWeak(List<MatchType> matchResults) {
         return matchResults.stream().filter(matchType -> matchType == MatchType.WEAK).findFirst().isPresent();
     }
@@ -213,7 +197,7 @@ public class MatchingService {
      * Assume input has correct format.
      *
      * @param line
-     * @return
+     * @return Transaction
      */
     private Transaction populate(String line) {
         String[] inputs = line.split(";");
