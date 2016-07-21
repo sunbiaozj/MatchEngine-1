@@ -92,8 +92,8 @@ public class MatchingService {
     }
 
     private void doWithXAsReference() {
-        File fileX = new File("x.txt");
-        File fileY = new File("y.txt");
+        File fileX = new File(fileXPath);
+        File fileY = new File(fileYPath);
 
         try (Stream<String> stream = Files.lines(Paths.get(fileX.getPath()))) {
             stream.forEach(s -> {
